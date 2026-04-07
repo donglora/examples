@@ -12,6 +12,9 @@ dependencies = [
 meshcore = ["donglora[meshcore]"]
 orac = ["donglora[orac]"]
 
+[dependency-groups]
+dev = ["ruff"]
+
 [tool.uv]
 package = false
 
