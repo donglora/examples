@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import contextlib
 import sys
 import time
 
@@ -48,10 +49,8 @@ try:
                 print(f"  RX: {text!r}  RSSI:{resp['rssi']}dBm  SNR:{resp['snr']}dB")
 
 except KeyboardInterrupt:
-    try:
+    with contextlib.suppress(Exception):
         dl.send(ser, "StopRx")
-    except Exception:
-        pass
     print("\nDone.")
 except serial.SerialException as e:
     print(f"\nSerial error: {e}", file=sys.stderr)

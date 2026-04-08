@@ -5,6 +5,7 @@ Usage:
     python examples/simple_rx.py [PORT]
 """
 
+import contextlib
 import sys
 
 import serial
@@ -26,12 +27,12 @@ try:
         resp = dl.decode_response(data)
         if resp["type"] == "RxPacket":
             p = resp["payload"]
-            print(f"  RSSI:{resp['rssi']:4d}dBm  SNR:{resp['snr']:3d}dB  len:{len(p):3d}  {p.hex()}")
+            print(
+                f"  RSSI:{resp['rssi']:4d}dBm  SNR:{resp['snr']:3d}dB  len:{len(p):3d}  {p.hex()}"
+            )
 except KeyboardInterrupt:
-    try:
+    with contextlib.suppress(Exception):
         dl.send(ser, "StopRx")
-    except Exception:
-        pass
     print("\nDone.")
 except serial.SerialException as e:
     print(f"\nSerial error: {e}", file=sys.stderr)

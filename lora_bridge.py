@@ -17,13 +17,15 @@ Both sides:
     - Forward received LoRa packets -> TCP -> remote side -> TX
     - Bidirectional: both sides receive AND transmit
 """
+
 import argparse
-import serial
 import socket
 import struct
 import sys
 import threading
 import time
+
+import serial
 
 import donglora as dl
 
@@ -84,7 +86,9 @@ def radio_to_tcp(ser: serial.Serial, sock: socket.socket):
                     grade = "GOOD"
 
                 if grade in ("INVALID", "UNRELIABLE"):
-                    print(f"  RX drop len:{len(payload):3d}  rssi:{rssi}dBm  snr:{snr}dB  [{grade}]")
+                    print(
+                        f"  RX drop len:{len(payload):3d}  rssi:{rssi}dBm  snr:{snr}dB  [{grade}]"
+                    )
                     continue
 
                 tag = f"  [{grade}]" if grade == "MARGINAL" else ""
