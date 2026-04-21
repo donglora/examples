@@ -2,20 +2,22 @@
 """Two-way LoRa bridge over TCP — relay packets between two DongLoRa dongles
 across any IP network (LAN, Tailscale, WireGuard, internet).
 
-Architecture:
+Architecture::
+
     [Radio A] <-USB-> [DongLoRa A] <-TCP-> [DongLoRa B] <-USB-> [Radio B]
 
-Usage:
+Usage::
+
     # Machine A (server):
     python examples/lora_bridge.py --mode server --port 9100
 
     # Machine B (client):
     python examples/lora_bridge.py --mode client --host machineA --port 9100
 
-Both sides:
-    - Open local DongLoRa, configure radio, start RX
-    - Forward received LoRa packets -> TCP -> remote side -> TX
-    - Bidirectional: both sides receive AND transmit
+Both sides open a local DongLoRa, listen for incoming LoRa packets,
+forward them over TCP to the peer, and transmit any TCP-arriving
+bytes over the air. The Dongle class handles keepalive + recovery
+internally, so no extra bookkeeping is needed here.
 """
 
 import argparse
@@ -25,9 +27,8 @@ import sys
 import threading
 import time
 
-import serial
-
 import donglora as dl
+from _common import MESHCORE_US
 
 
 def tcp_send(sock: socket.socket, payload: bytes):
@@ -45,7 +46,7 @@ def tcp_recv(sock: socket.socket) -> bytes | None:
         header += chunk
     length = struct.unpack("<I", header)[0]
     if length > 65536:
-        return None  # sanity check
+        return None
     data = b""
     while len(data) < length:
         chunk = sock.recv(length - len(data))
@@ -55,81 +56,50 @@ def tcp_recv(sock: socket.socket) -> bytes | None:
     return data
 
 
-_ser_lock = threading.Lock()
-
-
-def radio_to_tcp(ser: serial.Serial, sock: socket.socket):
+def radio_to_tcp(d: dl.Dongle, sock: socket.socket):
     """Thread: forward LoRa RX packets to TCP."""
-    ser.timeout = 1
-    while True:
+    for pkt in d.rx(timeout=1.0):
         try:
-            with _ser_lock:
-                data = dl.read_frame(ser)
-            if data is None:
+            sf = d.config.sf if isinstance(d.config, dl.LoRaConfig) else 7
+            min_snr = -2.5 * (sf - 4)
+            if pkt.snr_db < -32 or pkt.snr_db > 32:
+                grade = "INVALID"
+            elif pkt.snr_db < min_snr:
+                grade = "UNRELIABLE"
+            elif pkt.snr_db < min_snr + 3:
+                grade = "MARGINAL"
+            else:
+                grade = "GOOD"
+            if grade in ("INVALID", "UNRELIABLE"):
+                print(
+                    f"  RX drop len:{len(pkt.data):3d}  "
+                    f"rssi:{pkt.rssi_dbm:.1f}dBm  snr:{pkt.snr_db:.1f}dB  [{grade}]"
+                )
                 continue
-            resp = dl.decode_response(data)
-            if resp["type"] == "RxPacket":
-                payload = resp["payload"]
-                snr = resp["snr"]
-                rssi = resp["rssi"]
-                sf = dl.DEFAULT_CONFIG["sf"]
-                min_snr = -2.5 * (sf - 4)
-
-                # Grade per PROTOCOL.md — drop likely-corrupt packets
-                if snr < -32 or snr > 32:
-                    grade = "INVALID"
-                elif snr < min_snr:
-                    grade = "UNRELIABLE"
-                elif snr < min_snr + 3:
-                    grade = "MARGINAL"
-                else:
-                    grade = "GOOD"
-
-                if grade in ("INVALID", "UNRELIABLE"):
-                    print(
-                        f"  RX drop len:{len(payload):3d}  rssi:{rssi}dBm  snr:{snr}dB  [{grade}]"
-                    )
-                    continue
-
-                tag = f"  [{grade}]" if grade == "MARGINAL" else ""
-                print(f"  RX→TCP  len:{len(payload):3d}  rssi:{rssi}dBm  snr:{snr}dB{tag}")
-                tcp_send(sock, payload)
-        except (serial.SerialException, OSError) as e:
-            print(f"  [radio→tcp error: {e}]")
-            break
+            tag = f"  [{grade}]" if grade == "MARGINAL" else ""
+            print(
+                f"  RX→TCP  len:{len(pkt.data):3d}  "
+                f"rssi:{pkt.rssi_dbm:.1f}dBm  snr:{pkt.snr_db:.1f}dB{tag}"
+            )
+            tcp_send(sock, pkt.data)
+        except OSError as exc:
+            print(f"  [radio→tcp error: {exc}]")
+            return
 
 
-def tcp_to_radio(ser: serial.Serial, sock: socket.socket):
+def tcp_to_radio(d: dl.Dongle, sock: socket.socket):
     """Thread: forward TCP packets to LoRa TX."""
     while True:
         try:
             payload = tcp_recv(sock)
             if payload is None:
                 print("  [TCP disconnected]")
-                break
+                return
             print(f"  TCP→TX  len:{len(payload):3d}")
-            with _ser_lock:
-                dl.send(ser, "Transmit", payload=payload)
-        except (serial.SerialException, OSError) as e:
-            print(f"  [tcp→radio error: {e}]")
-            break
-
-
-def run_bridge(ser: serial.Serial, sock: socket.socket):
-    """Run bidirectional bridge between serial and TCP."""
-    print("Bridge active — forwarding packets bidirectionally\n")
-
-    t1 = threading.Thread(target=radio_to_tcp, args=(ser, sock), daemon=True)
-    t2 = threading.Thread(target=tcp_to_radio, args=(ser, sock), daemon=True)
-    t1.start()
-    t2.start()
-
-    try:
-        while t1.is_alive() and t2.is_alive():
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        pass
-    print("\nBridge stopped.")
+            d.tx(payload)
+        except (OSError, dl.DongloraError) as exc:
+            print(f"  [tcp→radio error: {exc}]")
+            return
 
 
 def main():
@@ -141,12 +111,6 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Open DongLoRa
-        ser = dl.connect(args.serial)
-        print(dl.send(ser, "SetConfig", config=dl.DEFAULT_CONFIG))
-        print(dl.send(ser, "StartRx"))
-
-        # Establish TCP connection
         if args.mode == "server":
             print(f"Listening on port {args.port}...")
             srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -162,15 +126,26 @@ def main():
             sock.connect((args.host, args.port))
             print("Connected")
 
-        run_bridge(ser, sock)
+        with dl.connect(args.serial, config=MESHCORE_US) as d:
+            print(f"Radio ready on {d.config.freq_hz / 1e6:.3f} MHz — bridging packets\n")
+            t1 = threading.Thread(target=radio_to_tcp, args=(d, sock), daemon=True)
+            t2 = threading.Thread(target=tcp_to_radio, args=(d, sock), daemon=True)
+            t1.start()
+            t2.start()
+            try:
+                while t1.is_alive() and t2.is_alive():
+                    time.sleep(0.5)
+            except KeyboardInterrupt:
+                pass
+        print("\nBridge stopped.")
 
     except KeyboardInterrupt:
         print("\nInterrupted.")
-    except serial.SerialException as e:
-        print(f"\nSerial error: {e}", file=sys.stderr)
+    except dl.DongloraError as exc:
+        print(f"\nDevice error: {exc}", file=sys.stderr)
         sys.exit(1)
-    except OSError as e:
-        print(f"\nNetwork error: {e}", file=sys.stderr)
+    except OSError as exc:
+        print(f"\nNetwork error: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

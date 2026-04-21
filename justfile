@@ -34,9 +34,9 @@ tx *args: _ensure_tools
 ping-pong *args: _ensure_tools
     @{{_uv}} {{source_directory()}}/ping_pong.py {{args}}
 
-# Exercise all DongLoRa commands
-test-commands *args: _ensure_tools
-    @{{_uv}} {{source_directory()}}/all_commands.py {{args}}
+# Probe the connected DongLoRa: dump GET_INFO and exercise one TX + RX
+explore *args: _ensure_tools
+    @{{_uv}} {{source_directory()}}/explore.py {{args}}
 
 # Two-way LoRa bridge over TCP
 bridge *args: _ensure_tools

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transmit a single LoRa packet.
+"""Transmit a single LoRa packet on the MeshCore US/Canada channel.
 
 Usage:
     python examples/simple_tx.py [PORT] [MESSAGE]
@@ -7,9 +7,8 @@ Usage:
 
 import sys
 
-import serial
-
 import donglora as dl
+from _common import MESHCORE_US
 
 port = None
 message = "Hello from DongLoRa!"
@@ -22,11 +21,6 @@ elif args:
     if len(args) > 1:
         message = " ".join(args[1:])
 
-try:
-    ser = dl.connect(port)
-    print(dl.send(ser, "SetConfig", config=dl.DEFAULT_CONFIG))
-    print(dl.send(ser, "Transmit", payload=message.encode()))
-    print(f"Sent: {message!r}")
-except serial.SerialException as e:
-    print(f"\nSerial error: {e}", file=sys.stderr)
-    sys.exit(1)
+with dl.connect(port, config=MESHCORE_US) as d:
+    td = d.tx(message.encode())
+    print(f"Sent {message!r} ({td.airtime_us} µs on air)")

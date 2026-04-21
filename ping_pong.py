@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Two-dongle demo: one transmits, one receives.
+"""Two-dongle demo on the MeshCore US/Canada channel: one TX, one RX.
 
 Usage:
     python examples/ping_pong.py --role tx [PORT]
@@ -7,51 +7,34 @@ Usage:
 """
 
 import argparse
-import contextlib
-import sys
 import time
 
-import serial
-
 import donglora as dl
+from _common import MESHCORE_US
 
 parser = argparse.ArgumentParser(description="DongLoRa ping-pong demo")
 parser.add_argument("--role", choices=["tx", "rx"], required=True)
 parser.add_argument("port", nargs="?", help="Serial port (auto-detect if omitted)")
 args = parser.parse_args()
 
-try:
-    ser = dl.connect(args.port)
-    print(dl.send(ser, "SetConfig", config=dl.DEFAULT_CONFIG))
-
+with dl.connect(args.port, config=MESHCORE_US) as d:
     if args.role == "tx":
         print("Transmitting every 2 seconds (Ctrl+C to stop)...\n")
-        seq = 0
-        while True:
-            msg = f"ping #{seq}"
-            resp = dl.send(ser, "Transmit", payload=msg.encode())
-            print(f"  TX: {msg!r}  → {resp['type']}")
-            seq += 1
-            time.sleep(2)
-
+        try:
+            seq = 0
+            while True:
+                msg = f"ping #{seq}"
+                td = d.tx(msg.encode())
+                print(f"  TX: {msg!r}  ({td.airtime_us} µs)")
+                seq += 1
+                time.sleep(2)
+        except KeyboardInterrupt:
+            print("\nDone.")
     else:
-        print(dl.send(ser, "StartRx"))
         print("Receiving (Ctrl+C to stop)...\n")
-        ser.timeout = 1
-        while True:
-            data = dl.read_frame(ser)
-            if data is None:
-                continue
-            resp = dl.decode_response(data)
-            if resp["type"] == "RxPacket":
-                p = resp["payload"]
-                text = p.decode("utf-8", errors="replace")
-                print(f"  RX: {text!r}  RSSI:{resp['rssi']}dBm  SNR:{resp['snr']}dB")
-
-except KeyboardInterrupt:
-    with contextlib.suppress(Exception):
-        dl.send(ser, "StopRx")
-    print("\nDone.")
-except serial.SerialException as e:
-    print(f"\nSerial error: {e}", file=sys.stderr)
-    sys.exit(1)
+        try:
+            for pkt in d.rx():
+                text = pkt.data.decode("utf-8", errors="replace")
+                print(f"  RX: {text!r}  RSSI:{pkt.rssi_dbm:.1f}dBm  SNR:{pkt.snr_db:.1f}dB")
+        except KeyboardInterrupt:
+            print("\nDone.")
