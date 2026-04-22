@@ -1,16 +1,16 @@
 [project]
 name = "donglora-examples"
-version = "0.1.0"
+version = "1.0.0"
 description = "DongLoRa example scripts"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
-    "donglora",
+    "donglora>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
-meshcore = ["donglora[meshcore]"]
-orac = ["donglora[orac]"]
+meshcore = ["donglora[meshcore]>=1.0.0,<2.0.0"]
+orac = ["donglora[orac]>=1.0.0,<2.0.0"]
 
 [dependency-groups]
 dev = ["ruff"]
