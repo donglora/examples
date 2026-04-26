@@ -18,9 +18,6 @@ dev = ["ruff"]
 [tool.uv]
 package = false
 
-[tool.uv.sources]
-donglora = { path = "../client-py", editable = true }
-
 [tool.ruff]
 line-length = 100
 target-version = "py310"

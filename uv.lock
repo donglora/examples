@@ -170,10 +170,14 @@ wheels = [
 [[package]]
 name = "donglora"
 version = "1.0.0"
-source = { editable = "../client-py" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cobs" },
     { name = "pyserial" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a2/f1/04a6befb8dac4e0d4b5be15f9589ac7800e15e5cf415fbf268e320a43aa3/donglora-1.0.0.tar.gz", hash = "sha256:6203ff8239a9d8a8e572d677dcd7783b457c2dd6e3dd1ae1b43eac670c7a86a9", size = 93130, upload-time = "2026-04-22T15:55:22.923Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/53/982d9ef76efae11c56ccaa4f92096d9849addb78111399d4c02d46cd3515/donglora-1.0.0-py3-none-any.whl", hash = "sha256:b2cae03149b54a7676c0c8e4850bcbd99d36edd6a4606aeb1980d50a0f5d94fe", size = 30566, upload-time = "2026-04-22T15:55:21.742Z" },
 ]
 
 [package.optional-dependencies]
@@ -185,25 +189,6 @@ orac = [
     { name = "anthropic" },
     { name = "pycryptodome" },
     { name = "pynacl" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", marker = "extra == 'orac'" },
-    { name = "cobs" },
-    { name = "pycryptodome", marker = "extra == 'meshcore'" },
-    { name = "pycryptodome", marker = "extra == 'orac'" },
-    { name = "pynacl", marker = "extra == 'meshcore'" },
-    { name = "pynacl", marker = "extra == 'orac'" },
-    { name = "pyserial" },
-]
-provides-extras = ["meshcore", "orac"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
 ]
 
 [[package]]
@@ -229,9 +214,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "donglora", editable = "../client-py" },
-    { name = "donglora", extras = ["meshcore"], marker = "extra == 'meshcore'", editable = "../client-py" },
-    { name = "donglora", extras = ["orac"], marker = "extra == 'orac'", editable = "../client-py" },
+    { name = "donglora", specifier = ">=1.0.0,<2.0.0" },
+    { name = "donglora", extras = ["meshcore"], marker = "extra == 'meshcore'", specifier = ">=1.0.0,<2.0.0" },
+    { name = "donglora", extras = ["orac"], marker = "extra == 'orac'", specifier = ">=1.0.0,<2.0.0" },
 ]
 provides-extras = ["meshcore", "orac"]
 
