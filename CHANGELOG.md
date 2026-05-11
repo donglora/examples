@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0 — 2026-05-11
+
+### Added
+
+- `sync_word_test.py`: two-dongle verification that
+  `LoRaConfig.sync_word` actually reaches the SX126x. TX rotates
+  through a set of sync words; RX pins one and should hear only the
+  matching cycles. RX drops `LOCAL_LOOPBACK` events so accidental
+  donglora-mux sharing fails loud instead of silently "matching"
+  every sync word.
+
+## 1.0.1 — 2026-04-25
+
+### Changed
+
+- Depend on the published `donglora` 1.0.0 from PyPI rather than the
+  editable `../client-py` path. No script changes; release-time
+  reproducibility only.
+
 ## 1.0.0 — 2026-04-22
 
 Initial public release of the example scripts, aligned to the 1.0

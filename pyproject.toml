@@ -1,6 +1,6 @@
 [project]
 name = "donglora-examples"
-version = "1.0.0"
+version = "1.1.0"
 description = "DongLoRa example scripts"
 license = "MIT"
 requires-python = ">=3.10"
